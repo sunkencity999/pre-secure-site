@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRE Secure — Sandboxed-by-default, audit-first agentic AI</title>
+<meta name="description" content="PRE Secure gives people AI agents that actually execute code — inside disposable, hardware-isolated Firecracker microVMs, with every action logged and every real-world change gated behind a human.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%233987e5' d='M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="var(--blue)" d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/><path fill="var(--bg)" d="M12 4.2l6 2.25V11c0 3.9-2.6 7.5-6 8.9-3.4-1.4-6-5-6-8.9V6.45l6-2.25z"/><path fill="var(--aqua)" d="M10.9 14.2l-2.3-2.3 1.1-1.1 1.2 1.2 3.4-3.4 1.1 1.1-4.5 4.5z"/></svg>
+    <span>PRE&nbsp;Secure</span>
+  </a>
+  <nav>
+    <a href="#problem">Problem</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#flow">Request&nbsp;flow</a>
+    <a href="#isolation">Isolation</a>
+    <a href="#gate">Approval&nbsp;gate</a>
+    <a href="#audit">Audit</a>
+    <a href="#models">Model&nbsp;infra</a>
+    <a href="#candor">Candor</a>
+  </nav>
+</header>
+
+<!-- ============================================================ HERO -->
+<section class="hero" id="top">
+  <div class="hero-copy reveal">
+    <p class="kicker">SANDBOXED BY DEFAULT&ensp;·&ensp;AUDIT FIRST&ensp;·&ensp;HUMAN GATED</p>
+    <h1>AI agents that execute real code.<br><span class="grad">On machines that never mattered.</span></h1>
+    <p class="lede">PRE Secure is a hardened agentic AI platform built around one question: <em>can we give people agents that actually run code and take actions — without handing a probabilistic system deterministic power over real infrastructure?</em></p>
+    <p class="lede strong">The answer: agents never touch the host. Every command runs inside a disposable, hardware-isolated Firecracker microVM. The worst thing an agent can do is destroy a sandbox that never mattered.</p>
+    <div class="hero-cta">
+      <a class="btn" href="#architecture">Explore the architecture</a>
+      <a class="btn ghost" href="#gate">Try the approval gate</a>
+    </div>
+  </div>
+
+  <!-- Hero animation: the disposal loop -->
+  <div class="hero-viz reveal" aria-label="Animation: an agent command travels into a microVM, the microVM is destroyed and instantly replaced, and the host is never touched.">
+    <svg viewBox="0 0 900 430" class="heroSvg" role="img">
+      <!-- sandbox plane -->
+      <rect x="30" y="26" width="840" height="248" rx="16" class="plane plane-sandbox"/>
+      <text x="52" y="56" class="plane-label aqua-t">DISPOSABLE SANDBOX PLANE — hardware-virtualized, separate kernel</text>
+
+      <!-- agent node -->
+      <g class="node">
+        <rect x="60" y="120" width="150" height="90" rx="12" class="nodebox"/>
+        <text x="135" y="158" class="nlabel" text-anchor="middle">AGENT</text>
+        <text x="135" y="180" class="nsub" text-anchor="middle">model + tool loop</text>
+      </g>
+
+      <!-- gateway node -->
+      <g class="node">
+        <rect x="300" y="120" width="170" height="90" rx="12" class="nodebox"/>
+        <text x="385" y="152" class="nlabel" text-anchor="middle">EXEC GATEWAY</text>
+        <text x="385" y="172" class="nsub" text-anchor="middle">~130 auditable lines</text>
+        <text x="385" y="190" class="nsub" text-anchor="middle">logs every call</text>
+      </g>
+
+      <!-- microVM (dies and respawns) -->
+      <g class="vm vm-old">
+        <rect x="600" y="100" width="220" height="130" rx="12" class="vmbox"/>
+        <text x="710" y="136" class="nlabel" text-anchor="middle">FIRECRACKER microVM</text>
+        <text x="710" y="158" class="nsub" text-anchor="middle">own kernel · own disk</text>
+        <text x="710" y="196" class="cmd danger-t" text-anchor="middle">$ rm -rf / --no-preserve-root</text>
+      </g>
+      <g class="vm vm-new">
+        <rect x="600" y="100" width="220" height="130" rx="12" class="vmbox fresh"/>
+        <text x="710" y="146" class="nlabel aqua-t" text-anchor="middle">FRESH microVM</text>
+        <text x="710" y="172" class="nsub" text-anchor="middle">respawned · nothing lost that mattered</text>
+      </g>
+      <text x="710" y="256" class="caption vm-caption" text-anchor="middle">sandbox destroyed → thrown away → replaced</text>
+
+      <!-- flow paths -->
+      <path id="hp1" d="M210,165 L300,165" class="flow"/>
+      <path id="hp2" d="M470,165 L600,165" class="flow"/>
+      <circle r="5" class="packet packet-hero"/>
+
+      <!-- host -->
+      <g class="host">
+        <rect x="30" y="308" width="840" height="96" rx="16" class="plane plane-host"/>
+        <g class="shield">
+          <path d="M84 330 l20 7.5 v15 c0 12.5-8.5 23.5-20 27.5 -11.5-4-20-15-20-27.5 v-15 z" class="shieldbg"/>
+          <path d="M81.2 355.5 l-6-6 2.8-2.8 3.2 3.2 8.8-8.8 2.8 2.8 z" fill="var(--bg)"/>
+        </g>
+        <text x="130" y="352" class="nlabel host-t">YOUR REAL INFRASTRUCTURE</text>
+        <text x="130" y="376" class="nsub">production hosts · databases · the network · everything that matters</text>
+        <text x="838" y="362" class="caption good-t host-caption" text-anchor="end">UNTOUCHED — no execution path exists</text>
+      </g>
+
+      <!-- the wall between planes -->
+      <line x1="30" y1="291" x2="870" y2="291" class="airgap"/>
+      <text x="450" y="296" class="airgap-label" text-anchor="middle">◆ ◆ ◆ &nbsp; NO DEFAULT EXECUTION PATH ACROSS THIS LINE &nbsp; ◆ ◆ ◆</text>
+    </svg>
+  </div>
+
+  <!-- stat tiles -->
+  <div class="tiles reveal">
+    <div class="tile"><div class="tv"><span class="count" data-count="63">0</span><span class="unit">ms</span></div><div class="tl">to pause an idle sandbox</div></div>
+    <div class="tile"><div class="tv"><span class="count" data-count="39">0</span><span class="unit">ms</span></div><div class="tl">to resume it on the next command</div></div>
+    <div class="tile"><div class="tv">100<span class="unit">%</span></div><div class="tl">of tool executions written to an append-only audit log</div></div>
+    <div class="tile"><div class="tv">1</div><div class="tl">persistent microVM per user — never shared, never the host</div></div>
+    <div class="tile"><div class="tv">0</div><div class="tl">bytes of chat, code, or context sent to third-party AI vendors</div></div>
+  </div>
+</section>
+
+<!-- ============================================================ PROBLEM -->
+<section class="section" id="problem">
+  <div class="sec-head reveal">
+    <p class="kicker">01 · THE PROBLEM</p>
+    <h2>The failure is architectural, not a model-quality problem</h2>
+  </div>
+  <div class="cols reveal">
+    <div class="prose">
+      <p>AI agents are extraordinarily useful — and extraordinarily dangerous when they execute code directly on real machines. Coding agents have caused real, headline-making incidents by doing <em>exactly what they were asked to do</em>, on the wrong target, with no containment between "the agent's workspace" and "everything else."</p>
+      <p>Better prompting doesn't fix a system where the agent's shell <em>is</em> the production shell. The fix is to make that untrue:</p>
+      <blockquote>Agents should never have execution access to anything that matters, by default. They get a disposable machine. If they misuse it, you throw the machine away and read the log of what happened.</blockquote>
+      <p>That's the entire thesis. Everything on this page is the engineering that makes it true in code — not just true on a slide.</p>
+    </div>
+    <div class="split-card">
+      <div class="split-row bad">
+        <div class="split-icon">✕</div>
+        <div><strong>Typical agent harness</strong><br><span>agent shell = your shell. One confused tool call away from <code>rm -rf</code> on the wrong box.</span></div>
+      </div>
+      <div class="split-row good">
+        <div class="split-icon">✓</div>
+        <div><strong>PRE Secure</strong><br><span>agent shell = a microVM with its own kernel. Blast radius: one disposable sandbox.</span></div>
+      </div>
+      <div class="thesis">
+        <span class="th-a">PRE Secure decides <em>what</em> the agent does.</span>
+        <span class="th-b">AgentENV decides <em>where</em> it can do it.</span>
+        <p>Two independent systems, deliberately decoupled. Swap the agent framework — the isolation survives. Swap the sandbox provider — the agent never notices (the API is <a href="https://e2b.dev" rel="noopener">E2B</a>-compatible, the de facto standard).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ARCHITECTURE -->
+<section class="section" id="architecture">
+  <div class="sec-head reveal">
+    <p class="kicker">02 · ARCHITECTURE AT A GLANCE</p>
+    <h2>Every path a request can take — and the one path that doesn't exist</h2>
+    <p class="sub">Hover any component for what it does. The moving dashes are the live paths a request actually follows.</p>
+  </div>
+  <div class="viz-frame reveal">
+    <svg viewBox="0 0 980 620" class="archSvg" role="img" aria-label="Architecture diagram: users reach nginx over TLS, then the application resolves tenant context and runs the tool loop; bash tool calls go through the exec gateway to the localhost-only AgentENV API and into per-user Firecracker microVMs; reasoning goes to local Ollama or an internal vLLM endpoint.">
+      <!-- edges (drawn first, under nodes) -->
+      <path d="M150,90 L150,150" class="flow f1"/>
+      <path d="M150,238 L150,300" class="flow f1"/>
+      <path d="M258,382 L332,382" class="flow f1"/>
+      <path d="M560,340 C640,340 640,150 700,132" class="flow f2"/>
+      <path d="M560,424 L700,424" class="flow f3"/>
+      <path d="M838,462 L838,506" class="flow f3"/>
+      <circle r="4" class="packet pk-a"/>
+      <circle r="4" class="packet pk-b"/>
+      <circle r="4" class="packet pk-c"/>
+
+      <!-- users -->
+      <g class="node" data-tip="Pilot users reach the platform over HTTPS only. No direct app port is exposed — the app itself binds to loopback.">
+        <rect x="40" y="30" width="220" height="60" rx="12" class="nodebox"/>
+        <text x="150" y="56" class="nlabel" text-anchor="middle">USERS</text>
+        <text x="150" y="76" class="nsub" text-anchor="middle">browser · HTTPS only</text>
+      </g>
+
+      <!-- nginx -->
+      <g class="node" data-tip="TLS termination (Let's Encrypt), HSTS, security headers, WebSocket upgrade for streamed chat. The only network-facing door.">
+        <rect x="40" y="150" width="220" height="88" rx="12" class="nodebox edge-node"/>
+        <text x="150" y="182" class="nlabel" text-anchor="middle">nginx EDGE</text>
+        <text x="150" y="202" class="nsub" text-anchor="middle">TLS · HSTS · security headers</text>
+        <text x="150" y="220" class="nsub" text-anchor="middle">firewall: 22/80/443 only</text>
+      </g>
+
+      <!-- app group -->
+      <g class="node" data-tip="Node.js multi-tenant app, systemd-hardened, non-root, loopback-bound. Auth, per-team tenancy, chat, tool loop.">
+        <rect x="40" y="300" width="520" height="180" rx="14" class="groupbox"/>
+        <text x="60" y="330" class="glabel">PRE SECURE APP <tspan class="nsub">— Node.js · systemd-hardened · non-root · binds 127.0.0.1</tspan></text>
+        <rect x="60" y="346" width="198" height="72" rx="10" class="nodebox inner"/>
+        <text x="159" y="376" class="nlabel sm" text-anchor="middle">AUTH + TENANT CTX</text>
+        <text x="159" y="396" class="nsub" text-anchor="middle">per-request isolation</text>
+        <rect x="332" y="346" width="198" height="72" rx="10" class="nodebox inner"/>
+        <text x="431" y="370" class="nlabel sm" text-anchor="middle">TOOL LOOP</text>
+        <text x="431" y="388" class="nsub" text-anchor="middle">bash · files · web search</text>
+        <text x="431" y="404" class="nsub" text-anchor="middle">14 cloud connectors</text>
+      </g>
+
+      <!-- gateway -->
+      <g class="node" data-tip="src/tools/aenv-exec.js — the only new execution code in the fork. Maps users to sandboxes, enforces quotas, writes the audit log. Never executes anything itself.">
+        <rect x="332" y="430" width="228" height="40" rx="10" class="nodebox hot"/>
+        <text x="446" y="455" class="nlabel sm blue-t" text-anchor="middle">EXEC GATEWAY SHIM</text>
+      </g>
+
+      <!-- models -->
+      <g class="node" data-tip="Per-team choice: fully local Ollama, or an OpenAI-compatible vLLM endpoint on a network you control. Either way, no third-party AI vendor.">
+        <rect x="700" y="40" width="240" height="150" rx="14" class="groupbox model-group"/>
+        <text x="720" y="70" class="glabel violet-t">MODEL SERVING</text>
+        <rect x="720" y="84" width="200" height="42" rx="9" class="nodebox inner"/>
+        <text x="820" y="110" class="nsub" text-anchor="middle">Local Ollama — on-box</text>
+        <rect x="720" y="136" width="200" height="42" rx="9" class="nodebox inner"/>
+        <text x="820" y="162" class="nsub" text-anchor="middle">Internal vLLM — your network</text>
+      </g>
+
+      <!-- isolation -->
+      <g class="node" data-tip="AgentENV (MIT, Firecracker orchestrator) has no built-in auth — so its API is bound to 127.0.0.1 and never exposed. The gateway is its only caller.">
+        <rect x="700" y="380" width="240" height="84" rx="12" class="nodebox lock-node"/>
+        <text x="820" y="410" class="nlabel sm" text-anchor="middle">AgentENV API</text>
+        <text x="820" y="432" class="nsub aqua-t" text-anchor="middle">127.0.0.1 only — never exposed</text>
+        <text x="820" y="450" class="nsub" text-anchor="middle">start · exec · pause · resume · fork</text>
+      </g>
+
+      <g class="node" data-tip="One persistent microVM per user — never per team, never shared. Pause preserves full disk state; resume takes ~39ms.">
+        <rect x="660" y="506" width="300" height="94" rx="14" class="groupbox sandbox-group"/>
+        <text x="680" y="534" class="glabel aqua-t">FIRECRACKER microVM POOL</text>
+        <g class="mini-vm"><rect x="682" y="548" width="80" height="38" rx="7" class="vmbox mini"/><text x="722" y="571" class="nsub" text-anchor="middle">user A</text></g>
+        <g class="mini-vm d2"><rect x="774" y="548" width="80" height="38" rx="7" class="vmbox mini"/><text x="814" y="571" class="nsub" text-anchor="middle">user B</text></g>
+        <g class="mini-vm d3"><rect x="866" y="548" width="80" height="38" rx="7" class="vmbox mini"/><text x="906" y="571" class="nsub" text-anchor="middle">user C</text></g>
+    </g>
+
+      <!-- edge labels -->
+      <text x="640" y="300" class="elabel" text-anchor="middle">chat / reasoning</text>
+      <text x="630" y="416" class="elabel aqua-t" text-anchor="middle">bash · file tools</text>
+      <text x="70" y="128" class="elabel">HTTPS</text>
+    </svg>
+    <div class="viz-tip" id="archTip" hidden></div>
+  </div>
+  <div class="callout reveal">
+    <strong>Nothing in this diagram grants the model a host shell.</strong> The only code that touches a real filesystem outside a sandbox is the gateway's small state/logging layer — and it never executes user-influenced commands; it only brokers <em>which sandbox</em> a command goes to.
+  </div>
+</section>
+
+<!-- ============================================================ REQUEST FLOW -->
+<section class="section" id="flow">
+  <div class="sec-head reveal">
+    <p class="kicker">03 · REQUEST FLOW</p>
+    <h2>Follow one command through the whole system</h2>
+    <p class="sub">Step through what happens when a user asks their agent to run something. Watch the audit log write itself.</p>
+  </div>
+  <div class="flow-demo reveal">
+    <div class="flow-stage">
+      <div class="lane-row" id="laneRow">
+        <div class="lane" data-lane="user"><span class="lane-ic">👤</span>User</div>
+        <div class="lane-arrow" data-edge="0">→</div>
+        <div class="lane" data-lane="nginx"><span class="lane-ic">🔒</span>nginx</div>
+        <div class="lane-arrow" data-edge="1">→</div>
+        <div class="lane" data-lane="app"><span class="lane-ic">⚙️</span>App</div>
+        <div class="lane-arrow" data-edge="2">→</div>
+        <div class="lane" data-lane="model"><span class="lane-ic">🧠</span>Model</div>
+        <div class="lane-arrow" data-edge="3">→</div>
+        <div class="lane" data-lane="gw"><span class="lane-ic">🛂</span>Gateway</div>
+        <div class="lane-arrow" data-edge="4">→</div>
+        <div class="lane" data-lane="vm"><span class="lane-ic">📦</span>microVM</div>
+      </div>
+      <div class="flow-desc" id="flowDesc"></div>
+      <div class="flow-controls">
+        <button class="btn sm ghost" id="flowPrev">‹ Back</button>
+        <button class="btn sm" id="flowNext">Next ›</button>
+        <button class="btn sm ghost" id="flowPlay">▶ Auto-play</button>
+        <span class="flow-step-label" id="flowStepLabel"></span>
+      </div>
+    </div>
+    <div class="term" aria-live="polite">
+      <div class="term-head"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">~/aenv-audit.log — append-only JSONL</span></div>
+      <pre id="auditLog" class="term-body"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ISOLATION -->
+<section class="section" id="isolation">
+  <div class="sec-head reveal">
+    <p class="kicker">04 · THE ISOLATION LADDER</p>
+    <h2>Same exploit, three very different blast radii</h2>
+    <p class="sub">Watch the ripple. The question isn't whether an agent will ever run something hostile — it's what happens when it does.</p>
+  </div>
+  <div class="ladder reveal">
+    <div class="rung">
+      <div class="rung-viz">
+        <div class="blast host-blast">
+          <div class="epicenter">💥</div>
+          <div class="ripple"></div><div class="ripple d1"></div><div class="ripple d2"></div>
+          <div class="infra i1">🗄️</div><div class="infra i2">🌐</div><div class="infra i3">🔑</div>
+        </div>
+      </div>
+      <h3>Host process</h3>
+      <p class="rtag bad-t">Typical CLI coding agent</p>
+      <p>The agent runs with your permissions, on your machine. Blast radius: <strong>total</strong>. Your files, your credentials, your network.</p>
+    </div>
+    <div class="rung">
+      <div class="rung-viz">
+        <div class="blast ns-blast">
+          <div class="ns-wall"></div>
+          <div class="epicenter">💥</div>
+          <div class="ripple"></div><div class="ripple d1"></div>
+          <div class="leak">container escape (a known CVE class)</div>
+        </div>
+      </div>
+      <h3>Container / namespace</h3>
+      <p class="rtag warn-t">Docker, bubblewrap</p>
+      <p>Real improvement — but the container <strong>shares the host kernel</strong>. A kernel exploit is a documented escape class, and it's the same kernel the whole time.</p>
+    </div>
+    <div class="rung featured">
+      <div class="rung-viz">
+        <div class="blast vm-blast">
+          <div class="vm-wall"><span class="vm-wall-label">separate kernel — hardware boundary (KVM)</span></div>
+          <div class="epicenter">💥</div>
+          <div class="ripple"></div><div class="ripple d1"></div>
+        </div>
+      </div>
+      <h3>Firecracker microVM</h3>
+      <p class="rtag good-t">PRE Secure — the default</p>
+      <p>The same virtualization AWS Lambda uses for billions of executions a day. Escape requires a <strong>hypervisor break</strong>, not a container CVE. And the VM is disposable anyway.</p>
+    </div>
+  </div>
+
+  <div class="cmp-wrap reveal">
+    <table class="cmp">
+      <thead><tr><th></th><th>Typical CLI agent</th><th>Container sandbox</th><th class="hl">PRE Secure</th></tr></thead>
+      <tbody>
+        <tr><td>Execution boundary</td><td>Host process, full user perms</td><td>Shared kernel, namespaces</td><td class="hl">Hardware-virtualized microVM, separate kernel</td></tr>
+        <tr><td>Kernel-exploit blast radius</td><td>Total</td><td>Escape is a known CVE class</td><td class="hl">Contained — needs a hypervisor escape</td></tr>
+        <tr><td>Disposability</td><td>It's your machine</td><td>Recreatable, but shares kernel state throughout</td><td class="hl">Snapshot / pause / fork / delete are first-class</td></tr>
+        <tr><td>Per-tenant isolation</td><td>None</td><td>Depends on setup</td><td class="hl">One persistent microVM per user, never shared</td></tr>
+        <tr><td>Audit trail of execution</td><td>Usually none</td><td>Varies</td><td class="hl">JSONL log of every exec: who, what, where, outcome</td></tr>
+        <tr><td>Model data residency</td><td>Usually a cloud API</td><td>Varies</td><td class="hl">Local or self-hosted only — nothing leaves your network</td></tr>
+        <tr><td>Real-world action path</td><td>Agent just does it</td><td>Agent just does it</td><td class="hl">Human-approved queue, executed by a separate no-sudo account</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- lifecycle -->
+  <div class="sec-head reveal lifecycle-head">
+    <h3>The sandbox lifecycle — persistent, pausable, disposable</h3>
+    <p class="sub">Each user gets <strong>one persistent sandbox</strong>, not a fresh one per command — agent work is a sequence (install, write, run, fix, run again), and state should survive it. Idle sandboxes are paused, not destroyed: disk state persists while CPU and memory are freed.</p>
+  </div>
+  <div class="viz-frame reveal">
+    <svg viewBox="0 0 900 260" class="lifeSvg" role="img" aria-label="State diagram: no sandbox, to running via aenv start, running loops on exec, running pauses on idle timeout, paused resumes on the next call, and either state can be deleted on cleanup.">
+      <g class="lstate" data-state="0"><rect x="40" y="90" width="170" height="70" rx="12" class="nodebox"/><text x="125" y="120" class="nlabel sm" text-anchor="middle">NO SANDBOX</text><text x="125" y="140" class="nsub" text-anchor="middle">first bash call</text></g>
+      <g class="lstate" data-state="1"><rect x="330" y="90" width="170" height="70" rx="12" class="nodebox run"/><text x="415" y="120" class="nlabel sm aqua-t" text-anchor="middle">RUNNING</text><text x="415" y="140" class="nsub" text-anchor="middle">exec · exec · exec…</text></g>
+      <g class="lstate" data-state="2"><rect x="620" y="90" width="170" height="70" rx="12" class="nodebox paused"/><text x="705" y="120" class="nlabel sm" text-anchor="middle">PAUSED</text><text x="705" y="140" class="nsub" text-anchor="middle">disk state preserved</text></g>
+      <path d="M210,115 L330,115" class="ledge" data-edge="0"/><text x="270" y="105" class="elabel" text-anchor="middle">start · quota checked</text>
+      <path d="M500,110 C540,80 580,80 620,110" class="ledge" data-edge="1"/><text x="560" y="78" class="elabel" text-anchor="middle">idle → pause (63 ms)</text>
+      <path d="M620,142 C580,172 540,172 500,142" class="ledge" data-edge="2"/><text x="560" y="188" class="elabel aqua-t" text-anchor="middle">next call → resume (39 ms)</text>
+      <path d="M415,160 C415,205 415,205 415,205" class="ledge faint" data-edge="3"/>
+      <text x="415" y="232" class="elabel danger-t" text-anchor="middle">cleanup / user removed → deleted 🗑</text>
+      <circle r="6" class="ltoken" id="lifeToken"/>
+    </svg>
+  </div>
+</section>
+
+<!-- ============================================================ APPROVAL GATE -->
+<section class="section" id="gate">
+  <div class="sec-head reveal">
+    <p class="kicker">05 · THE HUMAN APPROVAL GATE</p>
+    <h2>One narrow door out of the sandbox — and a human holds the key</h2>
+    <p class="sub">Sometimes a task genuinely needs to touch the real host. The agent can <em>propose</em> that. It can never <em>do</em> it. Try it yourself — you're the admin below.</p>
+  </div>
+
+  <div class="gate-demo reveal">
+    <div class="gate-stage">
+      <div class="gate-lane sandbox-lane">
+        <div class="gate-lane-label aqua-t">SANDBOX PLANE</div>
+        <div class="gate-agent">🤖 Agent</div>
+        <div class="gate-request" id="gateRequest">
+          <code>request_real_action(</code><br>
+          <code>&nbsp;&nbsp;command: "systemctl restart nginx",</code><br>
+          <code>&nbsp;&nbsp;reason: "config change needs a reload"</code><br>
+          <code>)</code>
+          <div class="gate-note">files a request — <strong>nothing executes</strong></div>
+        </div>
+      </div>
+      <div class="gate-wall" id="gateWall">
+        <div class="gate-door" id="gateDoor"></div>
+        <span class="gate-wall-label">HUMAN<br>GATE</span>
+      </div>
+      <div class="gate-lane real-lane">
+        <div class="gate-lane-label">REAL HOST</div>
+        <div class="gate-queue" id="gateQueue">📁 /var/lib/pre-runner/queue<br><span class="nsub">write-only job files</span></div>
+        <div class="gate-runner" id="gateRunner">👷 pre-runner<br><span class="nsub">separate account · no sudo</span></div>
+        <div class="gate-result" id="gateResult"></div>
+      </div>
+    </div>
+
+    <div class="gate-side">
+      <div class="toast" id="gateToast">
+        <div class="toast-head">⚡ Real-world action requested</div>
+        <div class="toast-body">
+          <code>systemctl restart nginx</code>
+          <p class="nsub">"config change needs a reload" — requested by an agent, team Alpha</p>
+        </div>
+        <div class="toast-actions">
+          <button class="btn sm approve" id="btnApprove">✓ Approve</button>
+          <button class="btn sm deny" id="btnDeny">✕ Deny</button>
+        </div>
+      </div>
+      <div class="term small">
+        <div class="term-head"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">real-action-audit.log</span></div>
+        <pre id="gateLog" class="term-body"></pre>
+      </div>
+      <button class="btn sm ghost" id="gateReset" hidden>↺ Run it again</button>
+    </div>
+  </div>
+
+  <div class="gate-points reveal">
+    <div class="gp"><h4>Why not just a sudo rule?</h4><p>A sudo grant — even a narrow one — is a privilege-escalation path sitting inside the app process, waiting for a supply-chain bug to use it. Instead, the app can only <strong>write a file describing a job</strong>. A completely separate account, with no sudo and no shared privileges, picks it up. There is no mechanism for the app to force execution.</p></div>
+    <div class="gp"><h4>What "approval" actually gates</h4><p><code>request_real_action</code> is a distinct tool from <code>bash</code> — the model must consciously choose the exception. Calling it never executes anything; it files a request, fires a real-time toast to admins, and waits.</p></div>
+    <div class="gp"><h4>The gate is human-vs-AI, not human-vs-human</h4><p>An admin may approve their own agent's request — the point is that the <em>AI</em> can never act unilaterally. Self-approvals are flagged <code>selfApproved: true</code> in the audit trail, so the pattern stays reviewable.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ DEFENSE IN DEPTH -->
+<section class="section" id="defense">
+  <div class="sec-head reveal">
+    <p class="kicker">06 · DEFENSE IN DEPTH</p>
+    <h2>Ten independent layers. Each one assumes the others can fail.</h2>
+    <p class="sub">Hover or tap a layer to see the specific threat it stops.</p>
+  </div>
+  <div class="depth reveal" id="depthStack">
+    <div class="dlayer" data-stops="Data exfiltration to third-party AI vendors"><span class="dl-name">Model residency</span><span class="dl-mech">local Ollama or self-hosted vLLM</span></div>
+    <div class="dlayer" data-stops="Cross-tenant data access; attribution gaps"><span class="dl-name">App tenancy</span><span class="dl-mech">per-user auth · per-request tenant context</span></div>
+    <div class="dlayer" data-stops="Untracked agent actions; runaway resource consumption"><span class="dl-name">Exec gateway</span><span class="dl-mech">one auditable choke point · concurrency quotas</span></div>
+    <div class="dlayer hot" data-stops="Host compromise from agent code — including the whole “rm -rf the wrong thing” class"><span class="dl-name">Firecracker microVM</span><span class="dl-mech">hardware virtualization · separate kernel per user</span></div>
+    <div class="dlayer" data-stops="Exploitation of the sandbox orchestrator's own lack of built-in auth"><span class="dl-name">API exposure</span><span class="dl-mech">AgentENV bound to 127.0.0.1 — period</span></div>
+    <div class="dlayer" data-stops="Privilege escalation even if an app process is itself compromised"><span class="dl-name">Host hardening</span><span class="dl-mech">systemd NoNewPrivileges · ProtectSystem=strict · capability bounds</span></div>
+    <div class="dlayer" data-stops="“What changed and when” ever being unanswerable"><span class="dl-name">Config history</span><span class="dl-mech">etckeeper — every /etc change is a git commit</span></div>
+    <div class="dlayer" data-stops="Credential and session interception in transit"><span class="dl-name">Network / TLS</span><span class="dl-mech">nginx · HSTS · default-deny firewall · loopback-bound services</span></div>
+    <div class="dlayer" data-stops="Lateral movement from a sandbox into internal networks — verified empirically, not just configured"><span class="dl-name">Egress control</span><span class="dl-mech">all RFC1918 / private-range traffic blocked from every sandbox</span></div>
+    <div class="dlayer" data-stops="An agent — or a prompt-injection-manipulated agent — unilaterally touching real systems"><span class="dl-name">Human gate</span><span class="dl-mech">propose → approve → separate no-sudo executor</span></div>
+    <div class="depth-tip" id="depthTip">Hover a layer ↑</div>
+  </div>
+  <div class="callout reveal">
+    <strong>Prompt injection is assumed, not hoped away.</strong> If an agent ingests hostile content and gets manipulated into running something harmful, the blast radius is a disposable microVM — not the host. The design assumes agents <em>will</em> occasionally be manipulated, and is built so that it mostly doesn't matter.
+  </div>
+</section>
+
+<!-- ============================================================ AUDIT -->
+<section class="section" id="audit">
+  <div class="sec-head reveal">
+    <p class="kicker">07 · AUDIT &amp; TRACEABILITY</p>
+    <h2>Four independent trails. Divergence is itself a signal.</h2>
+  </div>
+  <div class="audit-grid reveal">
+    <div class="acard"><div class="a-ic">🛡️</div><h4>Central security log</h4><p>Every security-relevant app event — logins, lockouts, role changes, config changes, approvals, exports — logged with actor + IP, <strong>and mirrored to the root-owned system journal</strong>. If the file and the journal ever diverge, that's a tamper signal.</p><code>audit/admin-audit.log</code></div>
+    <div class="acard"><div class="a-ic">📦</div><h4>Sandbox exec log</h4><p>Every command an agent runs, per user: identity, sandbox, the command itself, duration, outcome. The answer to <em>"what did the AI do inside its sandbox?"</em></p><code>&lt;user&gt;/aenv-audit.log</code></div>
+    <div class="acard"><div class="a-ic">🚪</div><h4>Real-action lifecycle log</h4><p>Every proposed real-host action, end to end: created → approved/denied → enqueued → result. The answer to <em>"what did a human authorize the AI to do outside it?"</em></p><code>&lt;team&gt;/real-action-audit.log</code></div>
+    <div class="acard"><div class="a-ic">🌿</div><h4>Host config history</h4><p>Every change to <code>/etc</code> — nginx, systemd units, sudoers — is a git commit with a diff, via etckeeper. The answer to <em>"what changed about the infrastructure itself?"</em></p><code>cd /etc &amp;&amp; git log</code></div>
+  </div>
+</section>
+
+<!-- ============================================================ DATA PROTECTION -->
+<section class="section" id="data">
+  <div class="sec-head reveal">
+    <p class="kicker">08 · DATA PROTECTION</p>
+    <h2>PII is scrubbed where data becomes durable — not where it's useful</h2>
+    <p class="sub">The agent <em>needs</em> live PII to do its job. The control point is the persistence boundary: the moment data would become long-term, team-shared, or model-bound, it's deterministically scrubbed. Watch it happen:</p>
+  </div>
+  <div class="scrub-demo reveal">
+    <div class="term">
+      <div class="term-head"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">live session → team memory (crossing the boundary)</span></div>
+      <div class="term-body scrub-body" id="scrubBody"></div>
+    </div>
+    <div class="scrub-notes">
+      <div class="gp"><h4>Deterministic, not model-based</h4><p>Regex + checksums: Luhn for cards, ISO 13616 mod-97 for IBANs. A compliance control you can <em>demonstrate</em> ("any Luhn-valid number is caught — here is the test") beats a probabilistic one. 15 tests cover every recognizer's positive <em>and</em> negative cases.</p></div>
+      <div class="gp"><h4>Typed, stable, non-reversible</h4><p>The placeholder suffix is a truncated HMAC-SHA256 keyed by the secrets key — the same value maps to the same placeholder in every store (cross-references survive), but without the key it can't be dictionary-reversed.</p></div>
+      <div class="gp"><h4>Secrets at rest</h4><p>Every credential file — OAuth tokens, provider API keys — is <strong>AES-256-GCM</strong> encrypted, with the key stored <em>outside</em> the data root. A copied data directory alone is ciphertext. Session tokens live in the DB only as SHA-256 hashes.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MODEL INFRA -->
+<section class="section featured-section" id="models">
+  <div class="sec-head reveal">
+    <p class="kicker violet-k">09 · SECURE MODEL INFRASTRUCTURE</p>
+    <h2>The model never leaves the building. Neither does your data.</h2>
+    <p class="sub">Most agent platforms are a thin shell around a third-party AI vendor's API — every prompt, every file, every secret in context crosses the internet to someone else's datacenter. PRE Secure is architected so that <strong>inference is infrastructure you control</strong>.</p>
+  </div>
+
+  <div class="viz-frame reveal">
+    <svg viewBox="0 0 980 440" class="modelSvg" role="img" aria-label="Diagram: chats, sandboxes, and model serving all live inside your network boundary; a crossed-out path to third-party AI clouds shows no route exists.">
+      <rect x="30" y="30" width="620" height="380" rx="18" class="plane plane-net"/>
+      <text x="56" y="64" class="plane-label violet-t">YOUR NETWORK BOUNDARY</text>
+
+      <g class="node"><rect x="60" y="100" width="180" height="80" rx="12" class="nodebox"/><text x="150" y="132" class="nlabel sm" text-anchor="middle">CHAT + CONTEXT</text><text x="150" y="154" class="nsub" text-anchor="middle">prompts · files · tools</text></g>
+      <g class="node"><rect x="60" y="240" width="180" height="80" rx="12" class="nodebox"/><text x="150" y="272" class="nlabel sm" text-anchor="middle">SANDBOXES</text><text x="150" y="294" class="nsub" text-anchor="middle">per-user microVMs</text></g>
+
+      <g class="node"><rect x="380" y="90" width="230" height="100" rx="12" class="nodebox inner"/><text x="495" y="122" class="nlabel sm violet-t" text-anchor="middle">LOCAL OLLAMA</text><text x="495" y="144" class="nsub" text-anchor="middle">on-box serving · loopback-bound</text><text x="495" y="164" class="nsub" text-anchor="middle">zero network egress for inference</text></g>
+      <g class="node"><rect x="380" y="230" width="230" height="100" rx="12" class="nodebox inner"/><text x="495" y="262" class="nlabel sm violet-t" text-anchor="middle">INTERNAL vLLM</text><text x="495" y="284" class="nsub" text-anchor="middle">OpenAI-compatible endpoint</text><text x="495" y="304" class="nsub" text-anchor="middle">on hardware you administer</text></g>
+
+      <path d="M240,140 L380,140" class="flow f2"/>
+      <path d="M240,280 L380,280" class="flow f2"/>
+      <circle r="4" class="packet pk-m1"/>
+      <circle r="4" class="packet pk-m2"/>
+
+      <text x="340" y="386" class="nsub" text-anchor="middle">swapping providers is a config change, not a code change — per-team choice</text>
+
+      <!-- third party cloud -->
+      <g class="deadzone">
+        <rect x="730" y="130" width="210" height="170" rx="18" class="nodebox dead"/>
+        <text x="835" y="180" class="nlabel sm muted-t" text-anchor="middle">THIRD-PARTY</text>
+        <text x="835" y="202" class="nlabel sm muted-t" text-anchor="middle">AI VENDOR CLOUD</text>
+        <text x="835" y="240" class="nsub" text-anchor="middle">your prompts · your code</text>
+        <text x="835" y="258" class="nsub" text-anchor="middle">your secrets in context</text>
+        <path d="M650,215 L730,215" class="deadpath"/>
+        <line x1="672" y1="197" x2="708" y2="233" class="deadx"/>
+        <line x1="708" y1="197" x2="672" y2="233" class="deadx"/>
+        <text x="690" y="256" class="elabel danger-t" text-anchor="middle">no route</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="model-points reveal">
+    <div class="gp"><h4>Per-team model choice, zero re-architecture</h4><p>Model serving resolves through a generic OpenAI-compatible provider abstraction. A team can point at fully-local Ollama or an internal vLLM endpoint — the isolation and audit architecture doesn't know or care which model answers.</p></div>
+    <div class="gp"><h4>Decoupled by design</h4><p>Because inference is decoupled from isolation, upgrading models (or adding GPUs) never touches the security architecture — and hardening the security never blocks a model upgrade.</p></div>
+    <div class="gp"><h4>The residency guarantee in one sentence</h4><p>Whether inference runs on-box or on an internal endpoint, <strong>no chat, code, context, or credential ever transits a third-party AI vendor.</strong> Data residency isn't a policy promise — it's a property of the network topology.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ SOX -->
+<section class="section" id="sox">
+  <div class="sec-head reveal">
+    <p class="kicker">10 · BUILT FOR AUDITORS</p>
+    <h2>Every control objective maps to a mechanism, a code path, and a test</h2>
+    <p class="sub">Compliance is an organizational determination, not a software property — what this system claims is narrower and checkable: for each IT general control objective, here is the mechanism and how to verify it.</p>
+  </div>
+  <div class="sox-grid reveal">
+    <div class="sox"><h4>Access control</h4><p>Per-user auth + OIDC/PKCE SSO · admin gating on every admin surface · per-team tenancy · disable/delete revokes all sessions and archives data</p></div>
+    <div class="sox"><h4>Authentication integrity</h4><p>12-char policy · login lockout · session tokens stored hashed · revocation on password change · CSRF and open-redirect guards</p></div>
+    <div class="sox"><h4>Audit evidence</h4><p>Central log with actor + IP, mirrored to the root-owned journal · per-user exec logs · real-action lifecycle log · admin UI views</p></div>
+    <div class="sox"><h4>Segregation of duties</h4><p>Agents sandboxed by default · real-host changes: agent proposes, human decides, a separate no-sudo account executes · self-approvals flagged</p></div>
+    <div class="sox"><h4>Change management</h4><p>Host config is a git history (etckeeper) · deploys are commits · provider/model config changes are audit events</p></div>
+    <div class="sox"><h4>Data confidentiality</h4><p>AES-256-GCM secrets at rest, key outside the data root · TLS + HSTS · local model serving · PII scrubbed at persistence boundaries</p></div>
+    <div class="sox"><h4>Records retention</h4><p>Offboarding archives (never silent deletion) · legal-hold export endpoint · opt-in retention sweeps that never touch audit logs</p></div>
+    <div class="sox"><h4>Operations containment</h4><p>systemd hardening · default-deny firewall · microVM isolation · verified private-range egress block · quotas · fail-closed defaults</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ CANDOR -->
+<section class="section" id="candor">
+  <div class="sec-head reveal">
+    <p class="kicker">11 · HONEST TRADEOFFS</p>
+    <h2>A security document that lists no gaps isn't trustworthy</h2>
+    <p class="sub">These are real, current, and tracked — stated plainly, the same way the closed ones were before they were closed.</p>
+  </div>
+  <div class="candor-list reveal">
+    <div class="cd"><span class="cd-badge">open</span><div><strong>The sandbox orchestrator is young.</strong> AgentENV is pre-1.0 and ships no auth of its own. Mitigated by strict localhost-only binding and by maintaining a privately patched fork — which helps, but doesn't eliminate the maturity risk.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>Sandbox egress to the public internet is open.</strong> All private-range (RFC1918) traffic is blocked and verified — but there's no domain-based allowlist yet, because the upstream egress proxy for domain rules isn't built. IP-based lists are brittle against CDNs; deliberately deferred rather than faked.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>PII Tier 2 (names, addresses) needs NER.</strong> Tier 1's deterministic classes are live at every persistence boundary; NER-grade detection (a Presidio sidecar, loopback-only) is planned and slots into the same seams.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>Single-box pilot.</strong> App, orchestrator, model serving, and proxy share one server — a single point of failure by design, for pilot simplicity. Scale-out is the documented path if the pilot grows.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>Audit logs aren't shipped off-host yet.</strong> File-based JSONL + a root-owned journal mirror is proportionate for a three-person pilot; it is not a SIEM, and shouldn't be mistaken for the end state.</div></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    <p><strong>PRE Secure</strong> is a hardened fork of PRETeams (a multi-tenant fork of PRE, the Personal Reasoning Engine), integrating <a href="https://github.com/kvcache-ai/AgentENV" rel="noopener">AgentENV</a> (MIT) and <a href="https://firecracker-microvm.github.io/" rel="noopener">Firecracker</a> for isolation, with an <a href="https://e2b.dev" rel="noopener">E2B</a>-compatible sandbox API.</p>
+    <p class="nsub">The full architecture document — including code paths, test evidence, and the complete control mapping — lives in the private repository. This page is the public summary. Deployment-specific details are intentionally omitted.</p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
