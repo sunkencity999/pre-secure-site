@@ -288,7 +288,7 @@
   if (scrubBody) {
     var SCRUB_HTML =
       '<span class="log-line">&gt; agent working — live session, PII allowed (the agent needs it):</span>' +
-      '<span class="log-line">“Emailed <span class="pii" data-ph="&lt;EMAIL_3f9a2c&gt;">jane.doe@example.com</span> about the offer — she confirmed at <span class="pii" data-ph="&lt;PHONE_81d2e0&gt;">(415) 555-0132</span>.”</span>' +
+      '<span class="log-line">“<span class="pii" data-ph="&lt;PERSON_71ac73&gt;">Jane Doe</span> confirmed from <span class="pii" data-ph="&lt;LOCATION_eea3de&gt;">Santa Cruz</span> — emailed <span class="pii" data-ph="&lt;EMAIL_3f9a2c&gt;">jane.doe@example.com</span>, called <span class="pii" data-ph="&lt;PHONE_81d2e0&gt;">(415) 555-0132</span>.”</span>' +
       '<span class="log-line">“Card <span class="pii" data-ph="&lt;CARD_4b17aa&gt;">4111 1111 1111 1111</span> validated (Luhn) · payout IBAN <span class="pii" data-ph="&lt;IBAN_c92f10&gt;">DE89 3704 0044 0532 0130 00</span> (mod-97).”</span>' +
       '<span class="log-line">“Deployed against 10.0.4.22 — <span class="keep">internal IP, exempt: it’s infrastructure, not personal data</span>.”</span>' +
       '<span class="log-line scrub-status" id="scrubStatus"></span>';
@@ -319,7 +319,7 @@
         }, (reduceMotion ? 400 : 2800) + i * (reduceMotion ? 80 : 550));
       });
       setTimeout(function () {
-        status.innerHTML = "&gt; write to team memory requested → <span class='ok'>scrubbed · placeholders are keyed HMACs — stable, typed, non-reversible · raw PII never hits disk</span>";
+        status.innerHTML = "&gt; write to team memory requested → <span class='ok'>scrubbed (Tier 1 checksums + Tier 2 NER) · placeholders are keyed HMACs — stable, typed, non-reversible · raw PII never hits disk</span>";
       }, reduceMotion ? 900 : 5600);
       setTimeout(runScrubLoop, reduceMotion ? 12000 : 11000);
     }
