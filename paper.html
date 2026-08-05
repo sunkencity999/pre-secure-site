@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRE Secure: A Sandboxed-by-Default, Audit-First Architecture for Agentic AI</title>
+<meta name="description" content="Technical write-up: how PRE Secure gives AI agents real execution capability inside disposable hardware-isolated microVMs, with complete audit trails and a human approval gate for real-world actions.">
+<link rel="stylesheet" href="paper.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%233987e5' d='M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<nav class="doc-nav">
+  <a href="index.html">← Back to the interactive explainer</a>
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save as PDF</button>
+</nav>
+
+<article class="doc">
+
+<header class="doc-head">
+  <p class="doc-kicker">TECHNICAL WRITE-UP · AUGUST 2026</p>
+  <h1>PRE Secure: A Sandboxed-by-Default, Audit-First Architecture for Agentic AI</h1>
+  <p class="doc-sub">How to give people AI agents that actually execute code and take actions, without handing a probabilistic system deterministic power over real infrastructure.</p>
+</header>
+
+<section class="abstract">
+  <h2>Abstract</h2>
+  <p>AI agents that execute code are extraordinarily useful and extraordinarily dangerous: several headline incidents have been caused by agents doing exactly what they were asked to do, on the wrong target, with no containment between the agent's workspace and everything else. We argue this failure is architectural rather than a model-quality problem, and describe PRE Secure, a multi-tenant agentic AI platform built on a single thesis: <em>agents should never have execution access to anything that matters, by default.</em> Every agent command executes inside a disposable, hardware-isolated Firecracker microVM — one persistent sandbox per user, pausable in ~63&nbsp;ms and resumable in ~39&nbsp;ms. Every execution is written to an append-only audit log. The one deliberate door out of the sandbox — real-world actions against actual infrastructure — requires an explicit human approval and is executed by a separate, unprivileged system account the application cannot control. Model inference runs only on infrastructure the operator controls (local or self-hosted serving), so no chat, code, or credential ever transits a third-party AI vendor. We describe the isolation model, the approval gate, the audit design, data-protection controls, the mapping to IT general-control objectives, and the system's honest limitations.</p>
+</section>
+
+<section>
+  <h2>1. The problem</h2>
+  <p>A typical agentic coding harness runs tool calls as a host process with the invoking user's full permissions: the agent's shell <em>is</em> the production shell. In that configuration, safety reduces to hoping the model never emits a harmful command — and models, being probabilistic, eventually will, whether through error, ambiguity, or manipulation by hostile content (prompt injection). Better prompting cannot fix this; it only lowers the frequency of an event whose single occurrence may be catastrophic.</p>
+  <p>The fix is to make the dangerous configuration untrue. Give the agent a disposable machine. If it misuses that machine, throw the machine away and read the log of what happened. The engineering question is then: how do you make the disposable machine fast enough, stateful enough, and observable enough to be the <em>default</em> — not a degraded special mode?</p>
+</section>
+
+<section>
+  <h2>2. Design thesis and architecture</h2>
+  <p>PRE Secure is composed of two independent, deliberately decoupled systems:</p>
+  <blockquote>PRE Secure decides <em>what</em> the agent does. AgentENV decides <em>where</em> it can do it.</blockquote>
+  <p>The application layer is a multi-tenant Node.js platform (a hardened fork of the open-source PRETeams project): per-user authentication, per-team tenancy, chat, a tool-calling loop (shell, file tools, web search, cloud connectors), and an admin surface. The isolation layer is AgentENV, an MIT-licensed orchestrator for Firecracker microVMs exposing an E2B-compatible sandbox API — the closest thing the industry has to a standard, which keeps the integration portable across sandbox providers.</p>
+  <p>The two layers meet at a single, small integration point: an <strong>exec gateway shim</strong> of roughly 130 lines. When the model emits a <code>bash</code> (or file-tool) call, the gateway maps the requesting user to their sandbox, resumes or creates it (checking a concurrency quota first), forwards the command, appends an audit record, and returns the output. The gateway never executes user-influenced commands itself; it only brokers <em>which sandbox</em> a command goes to. The request path is:</p>
+  <p class="flow-line"><code>user → TLS edge (nginx) → app (auth, tenancy) → model (local/self-hosted) → tool call → exec gateway → AgentENV API (loopback-only) → per-user Firecracker microVM</code></p>
+  <p>Nothing in this path grants the model or the agent loop a host shell.</p>
+</section>
+
+<section>
+  <h2>3. Isolation model</h2>
+  <h3>3.1 Why microVMs rather than containers</h3>
+  <p>Containers and namespace sandboxes (Docker, bubblewrap) are a real improvement over nothing, but they share the host kernel; container escape via kernel exploit is a well-documented CVE class, and the shared kernel is exposed for the sandbox's entire lifetime. Firecracker — the virtual machine monitor AWS built for Lambda and Fargate — provides hardware virtualization (KVM) with a minimal device model, so each sandbox runs a <em>separate kernel</em>. Escaping requires a hypervisor break, a categorically rarer event. Because Firecracker strips general-purpose VMM features, microVMs boot in milliseconds and idle at a few megabytes, which is what makes "one VM per user, resumed on demand" practical: measured on the reference deployment, pausing an idle sandbox takes ~63&nbsp;ms and resuming takes ~39&nbsp;ms — invisible inside an agent's think-act loop.</p>
+  <h3>3.2 Sandbox lifecycle</h3>
+  <p>Each user receives <strong>one persistent sandbox</strong>, keyed per user rather than per team: shared team membership should not imply shared shell or file access. Agent work is usually a sequence of related commands (install, write, run, fix, run again), so the sandbox is reused across calls and its disk state persists across a whole working session. Idle sandboxes are paused — not destroyed — by an opportunistic hook plus an independent scheduled sweep, freeing CPU and memory while preserving state. Deletion is reserved for user removal or explicit cleanup, and is itself a first-class, logged operation.</p>
+  <h3>3.3 Containing the orchestrator itself</h3>
+  <p>AgentENV ships with no built-in authorization: anyone who can reach its API can create, execute in, or destroy sandboxes. The deployment treats this the only correct way — the API is bound to <code>127.0.0.1</code> and never exposed beyond the host; the exec gateway, running in-process with the app, is its only caller. Sandbox network egress is restricted at the node level: all RFC1918/private-range traffic is blocked from every sandbox unconditionally — verified empirically (sandbox→internal host: refused; sandbox→public internet: allowed), not merely configured — so a compromised or manipulated agent cannot move laterally into internal networks, including the host's own LAN.</p>
+</section>
+
+<section>
+  <h2>4. The human approval gate for real-world actions</h2>
+  <p>Some tasks legitimately need to touch real infrastructure. PRE Secure provides exactly one door for this, designed so the AI can never open it alone:</p>
+  <ol>
+    <li>The agent calls a distinct tool, <code>request_real_action(command, reason)</code>. This is separate from <code>bash</code> — the model must consciously choose the exception. The call <em>files a request</em>; nothing executes.</li>
+    <li>Admins are notified in real time (a persistent UI toast with the exact command and stated reason, plus a durable admin-panel queue covering every team). An admin approves or denies; either decision is recorded.</li>
+    <li>On approval, the application writes a <em>job description file</em> into a queue directory. The application has no mechanism to execute the job — it can only describe it.</li>
+    <li>A completely separate system account (<code>pre-runner</code>) — no sudo, no group memberships beyond the narrow shared queue directory — is triggered by the new file, executes the command, and writes the result back. A collector merges the outcome into the team's log.</li>
+  </ol>
+  <p>The deliberate rejection of the obvious design — a scoped sudo rule — matters: a sudo grant, however narrow, is a privilege-escalation path sitting inside the app process, waiting for a supply-chain bug to exercise it. A write-only file queue between two unprivileged accounts is not.</p>
+  <p>The gate is a human-vs-AI boundary, not a two-person rule between humans: an admin may approve their own agent's request, and such approvals are explicitly flagged (<code>selfApproved: true</code>) in the audit trail so the pattern remains reviewable. The full lifecycle — created, approved/denied, enqueued, result recorded — is logged with the requesting user, the deciding admin, and the execution outcome.</p>
+</section>
+
+<section>
+  <h2>5. Defense in depth</h2>
+  <p>Each layer assumes the others can fail:</p>
+  <ul>
+    <li><strong>Model residency</strong> — inference is local or self-hosted; no data path to third-party AI vendors exists.</li>
+    <li><strong>App tenancy</strong> — per-user authentication; per-request tenant context that fails closed outside a request.</li>
+    <li><strong>Exec gateway</strong> — one auditable choke point for all tool execution; concurrency quotas; rejected requests are logged, not silent.</li>
+    <li><strong>Hardware isolation</strong> — a separate kernel per user via Firecracker.</li>
+    <li><strong>Orchestrator exposure</strong> — loopback-only binding for the sandbox API.</li>
+    <li><strong>Host hardening</strong> — systemd <code>NoNewPrivileges</code>, <code>ProtectSystem=strict</code>, private devices, and capability bounding on all services, which run as non-root accounts.</li>
+    <li><strong>Config history</strong> — every change to <code>/etc</code> is a git commit (etckeeper), independent of anything an agent does.</li>
+    <li><strong>Network</strong> — TLS with HSTS at the only network-facing door; the app itself binds loopback; default-deny firewall.</li>
+    <li><strong>Egress control</strong> — verified private-range block from every sandbox.</li>
+    <li><strong>Human gate</strong> — the approval workflow of §4.</li>
+  </ul>
+  <p>Prompt injection is treated as an assumption, not an edge case: if an agent ingests hostile content and is manipulated into running something harmful, the blast radius is a disposable microVM. The design expects agents to occasionally be manipulated and is built so that it mostly doesn't matter.</p>
+</section>
+
+<section>
+  <h2>6. Audit and traceability</h2>
+  <p>Four independent, complementary trails answer four different questions:</p>
+  <ol>
+    <li><strong>Central security log</strong> — every security-relevant application event (logins and lockouts, password and role changes, team and provider config changes, real-action decisions, exports, purges) with actor and IP, written as JSONL <em>and mirrored to the root-owned system journal</em>, which the application account cannot modify. Divergence between the two copies is itself a tamper signal.</li>
+    <li><strong>Sandbox exec log</strong> — every command an agent runs, per user: identity, sandbox, command, duration, outcome. <em>What did the AI do inside its sandbox?</em></li>
+    <li><strong>Real-action lifecycle log</strong> — the full history of every proposed real-host action and its human decision. <em>What did a human authorize the AI to do outside it?</em></li>
+    <li><strong>Host configuration history</strong> — etckeeper's git log of <code>/etc</code>. <em>What changed about the infrastructure itself?</em></li>
+  </ol>
+</section>
+
+<section>
+  <h2>7. Data protection</h2>
+  <h3>7.1 Secrets at rest</h3>
+  <p>Every secret-bearing file — per-user connector credentials, per-team model-provider keys — is encrypted with AES-256-GCM, with the key stored outside the data root: a copied data directory alone is ciphertext, and GCM's authentication tag makes a tampered file fail closed. Session tokens are stored only as SHA-256 hashes, so database access never yields a usable cookie.</p>
+  <h3>7.2 PII scrubbing at persistence boundaries</h3>
+  <p>The agent needs live PII to do its job ("email Jane about her offer" cannot work otherwise), so the control point is not the input but the <strong>persistence boundary</strong>: PII remains available in the live session and is scrubbed the moment data would become durable, team-shared, or model-bound (team memory, experience lessons, knowledge graph, RAG stores, training exports). Detection is deterministic — regex plus checksums (Luhn for cards, ISO 13616 mod-97 for IBANs) — because a demonstrable control beats a probabilistic one; placeholders are typed and stable (a truncated keyed HMAC), so cross-references survive scrubbing but placeholders cannot be dictionary-reversed without the key. Internal infrastructure addresses are deliberately exempt (they are the system's own plumbing, not personal data), and the recognizers carry false-positive guards, each covered by tests on both positive and negative cases. NER-grade detection for names and street addresses is a planned second tier (§9).</p>
+</section>
+
+<section>
+  <h2>8. Model serving and residency</h2>
+  <p>Model choice is a per-team setting resolved through a generic OpenAI-compatible provider abstraction, fully decoupled from the isolation and audit architecture. Supported paths are fully local serving (Ollama, on-box, loopback-bound — zero network egress for inference) or a self-hosted vLLM endpoint on a network the operator controls. Neither sends data to a third-party AI vendor; swapping between them is a configuration change, not a code change. Data residency is therefore a property of the network topology rather than a policy promise.</p>
+</section>
+
+<section>
+  <h2>9. Control-objective mapping and limitations</h2>
+  <p>For organizations evaluating the platform against IT general-control objectives (the lens SOX auditors apply — access to programs and data, program changes, computer operations, audit evidence, records retention), each objective maps to a concrete mechanism above: unique attributable access and timely deprovisioning (§2, §6, §7); authentication and session integrity (§7.1 plus lockout, password policy, CSRF and redirect guards); complete, tamper-evident audit evidence (§6); segregation of duties for real-system changes (§4); change-management visibility (§5, config history); confidentiality at rest and in transit (§7, §5); records retention and lifecycle (offboarding archives, legal-hold export, opt-in retention sweeps that never touch audit logs); and operational containment (§3, §5). Compliance itself is an organizational and audit determination — the claim here is narrower and checkable: for each objective, here is the mechanism, and here is how to verify it.</p>
+  <p>Known limitations, stated candidly: the sandbox orchestrator is young (pre-1.0) and ships no authorization of its own, mitigated but not eliminated by loopback-only binding and a privately maintained patched fork; sandbox egress to the <em>public</em> internet is open pending upstream support for domain-based allowlisting (IP-based lists being brittle against CDNs); NER-grade PII detection is not yet deployed; the reference deployment is a single box by design at pilot scale; and audit logs are not yet shipped off-host to a SIEM. A security document that lists no gaps isn't trustworthy; these are real, current, and tracked.</p>
+</section>
+
+<section>
+  <h2>10. Conclusion</h2>
+  <p>The recurring agentic-AI failure — an agent with production access doing exactly what it was told, on the wrong target — is an architecture problem, and architecture fixes it. Hardware-isolated, disposable, per-user sandboxes make destructive commands survivable by construction; a single small gateway makes every execution attributable; a human approval gate with privilege separation makes real-world action a deliberate, logged, human decision; and self-hosted inference keeps every byte of context inside the operator's network. None of this constrains what the agent can usefully do — it constrains what a mistake can cost.</p>
+</section>
+
+<section class="refs">
+  <h2>References</h2>
+  <ol>
+    <li>Firecracker microVM — <a href="https://firecracker-microvm.github.io/">firecracker-microvm.github.io</a></li>
+    <li>AgentENV, MIT-licensed Firecracker orchestrator — <a href="https://github.com/kvcache-ai/AgentENV">github.com/kvcache-ai/AgentENV</a></li>
+    <li>E2B sandbox API — <a href="https://e2b.dev">e2b.dev</a></li>
+    <li>PRETeams (upstream project) — <a href="https://github.com/sunkencity999/preteams">github.com/sunkencity999/preteams</a></li>
+    <li>Microsoft Presidio (planned PII Tier 2) — <a href="https://microsoft.github.io/presidio/">microsoft.github.io/presidio</a></li>
+  </ol>
+</section>
+
+<footer class="doc-foot">
+  <p>This write-up is the public companion to a private, code-level architecture document; deployment-specific details are intentionally omitted. For the interactive version of this material, see the <a href="index.html">explainer site</a>.</p>
+</footer>
+
+</article>
+</body>
+</html>

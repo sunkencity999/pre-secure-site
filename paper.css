@@ -1,0 +1,121 @@
+/* PRE Secure — write-up page: document-style, print-friendly */
+
+:root {
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --line: #2c2c2a;
+  --line-2: #383835;
+  --blue: #3987e5;
+  --aqua: #199e70;
+  --aqua-soft: rgba(25, 158, 112, 0.13);
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: Georgia, "Times New Roman", Times, serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--serif);
+  font-size: 17.5px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+}
+
+.doc-nav {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: 0.7rem clamp(1rem, 4vw, 2.5rem);
+  background: rgba(13, 13, 13, 0.82);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--sans); font-size: 0.85rem;
+}
+.doc-nav a { color: var(--muted); text-decoration: none; }
+.doc-nav a:hover { color: var(--ink); }
+.print-btn {
+  font-family: var(--sans); font-size: 0.8rem; font-weight: 600;
+  color: var(--ink-2); background: var(--surface); border: 1px solid var(--line-2);
+  border-radius: 8px; padding: 0.4rem 0.9rem; cursor: pointer;
+}
+.print-btn:hover { color: var(--ink); border-color: var(--muted); }
+
+.doc { max-width: 46rem; margin: 0 auto; padding: clamp(2.5rem, 6vw, 4.5rem) 1.4rem 5rem; }
+
+.doc-head { margin-bottom: 3rem; }
+.doc-kicker { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; color: var(--blue); }
+h1 {
+  font-family: var(--sans); font-weight: 750; letter-spacing: -0.015em;
+  font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.2; color: var(--ink);
+  margin: 0.4em 0 0.5em;
+}
+.doc-sub { font-size: 1.12rem; font-style: italic; color: var(--muted); }
+
+h2 {
+  font-family: var(--sans); font-weight: 700; letter-spacing: -0.01em;
+  font-size: 1.32rem; color: var(--ink); margin: 2.4em 0 0.7em;
+}
+h3 {
+  font-family: var(--sans); font-weight: 650;
+  font-size: 1.05rem; color: var(--ink); margin: 1.8em 0 0.5em;
+}
+p { margin: 0 0 1.05em; }
+em { color: var(--ink); }
+strong { color: var(--ink); }
+a { color: var(--blue); }
+
+.abstract {
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px;
+  padding: 1.5rem 1.8rem; margin-bottom: 1rem;
+}
+.abstract h2 { margin: 0 0 0.6em; font-size: 1.05rem; }
+.abstract p { margin: 0; font-size: 0.98em; }
+
+blockquote {
+  margin: 1.4em 0; padding: 0.9em 1.3em;
+  border-left: 3px solid var(--aqua);
+  background: var(--aqua-soft);
+  border-radius: 0 10px 10px 0;
+  color: var(--ink); font-style: italic;
+}
+
+code {
+  font-family: var(--mono); font-size: 0.82em;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 5px; padding: 0.1em 0.4em; color: var(--ink-2);
+}
+.flow-line { font-size: 0.9em; }
+.flow-line code { display: block; padding: 0.8em 1em; line-height: 1.8; }
+
+ol, ul { padding-left: 1.4em; margin: 0 0 1.05em; }
+li { margin-bottom: 0.45em; }
+
+.refs ol { font-size: 0.94em; }
+.doc-foot {
+  margin-top: 3.5rem; padding-top: 1.4rem; border-top: 1px solid var(--line);
+  font-size: 0.9em; color: var(--muted);
+}
+
+/* ---------------- print ---------------- */
+@media print {
+  :root { color-scheme: light; }
+  body { background: #fff; color: #222; font-size: 11pt; line-height: 1.55; }
+  .doc-nav { display: none; }
+  .doc { max-width: none; padding: 0; }
+  h1, h2, h3, em, strong, blockquote { color: #000; }
+  .doc-kicker { color: #555; }
+  .doc-sub, .doc-foot { color: #444; }
+  .abstract { background: #f4f4f2; border-color: #ddd; }
+  blockquote { background: #f0f7f4; border-left-color: #1a7a58; }
+  code { background: #f4f4f2; border-color: #ddd; color: #222; }
+  a { color: #1a4f8f; text-decoration: none; }
+  .refs a::after { content: none; }
+  h2, h3 { break-after: avoid; }
+  blockquote, .abstract, li { break-inside: avoid; }
+}
