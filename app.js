@@ -310,7 +310,7 @@
       var status = document.getElementById("scrubStatus");
       var piis = scrubBody.querySelectorAll(".pii");
       setTimeout(function () {
-        status.innerHTML = "&gt; write to team memory requested → <span class='ok'>pii-scrub: crossing persistence boundary…</span>";
+        status.innerHTML = "&gt; write to user memory requested → <span class='ok'>pii-scrub: crossing persistence boundary…</span>";
       }, reduceMotion ? 200 : 1800);
       piis.forEach(function (el, i) {
         setTimeout(function () {
@@ -319,7 +319,7 @@
         }, (reduceMotion ? 400 : 2800) + i * (reduceMotion ? 80 : 550));
       });
       setTimeout(function () {
-        status.innerHTML = "&gt; write to team memory requested → <span class='ok'>scrubbed (Tier 1 checksums + Tier 2 NER) · placeholders are keyed HMACs — stable, typed, non-reversible · raw PII never hits disk</span>";
+        status.innerHTML = "&gt; write to user memory requested → <span class='ok'>scrubbed (Tier 1 checksums + Tier 2 NER) · placeholders are keyed HMACs — stable, typed, non-reversible · raw PII never hits disk</span>";
       }, reduceMotion ? 900 : 5600);
       setTimeout(runScrubLoop, reduceMotion ? 12000 : 11000);
     }
