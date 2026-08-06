@@ -442,13 +442,14 @@
 <section class="section" id="audit">
   <div class="sec-head reveal">
     <p class="kicker">07 · AUDIT &amp; TRACEABILITY</p>
-    <h2>Four independent trails. Divergence is itself a signal.</h2>
+    <h2>Four independent trails — and an off-host export for all of them</h2>
   </div>
   <div class="audit-grid reveal">
     <div class="acard"><div class="a-ic">🛡️</div><h4>Central security log</h4><p>Every security-relevant app event — logins, lockouts, role changes, config changes, approvals, exports — logged with actor + IP, <strong>and mirrored to the root-owned system journal</strong>. If the file and the journal ever diverge, that's a tamper signal.</p><code>audit/admin-audit.log</code></div>
     <div class="acard"><div class="a-ic">📦</div><h4>Sandbox exec log</h4><p>Every command an agent runs, per user: identity, sandbox, the command itself, duration, outcome. The answer to <em>"what did the AI do inside its sandbox?"</em></p><code>&lt;user&gt;/aenv-audit.log</code></div>
     <div class="acard"><div class="a-ic">🚪</div><h4>Real-action lifecycle log</h4><p>Every proposed real-host action, end to end: created → approved/denied → enqueued → result. The answer to <em>"what did a human authorize the AI to do outside it?"</em></p><code>&lt;team&gt;/real-action-audit.log</code></div>
     <div class="acard"><div class="a-ic">🌿</div><h4>Host config history</h4><p>Every change to <code>/etc</code> — nginx, systemd units, sudoers — is a git commit with a diff, via etckeeper. The answer to <em>"what changed about the infrastructure itself?"</em></p><code>cd /etc &amp;&amp; git log</code></div>
+    <div class="acard"><div class="a-ic">📡</div><h4>SIEM export API</h4><p>All application trails, pullable off-host with zero shell access: a read-only API merges them into one checkpointable stream plus a security-metrics snapshot. Per-consumer tokens are issued and revoked from the admin console — shown once, stored only as hashes, last use visible, and their lifecycle is itself audited.</p><code>GET /api/siem/audit?since=…</code></div>
   </div>
 </section>
 
@@ -551,7 +552,7 @@
     <div class="cd"><span class="cd-badge">open</span><div><strong>Web egress allowlisting shipped — DNS and UDP residuals remain.</strong> Sandboxes can now run deny-by-default with a per-user domain allowlist, enforced by a TCP egress proxy built into the maintained fork: web traffic is transparently redirected inside the sandbox's network namespace, matched by HTTP Host / TLS SNI, and resolved host-side so a forged SNI can't pick the upstream address. Access is a per-user admin setting in the UI. Stated plainly, what remains: UDP (QUIC) is not proxied, DNS stays reachable as a low-bandwidth exfiltration channel, and non-web ports are governed by IP/CIDR rules only.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>Street-number address lines are only partially caught.</strong> Tier-2 NER (a loopback-only Presidio sidecar) now scrubs names and named locations at every persistence boundary — but bare numeric street lines ("123 Main St") evade general NER; a dedicated address-pattern recognizer is the tracked follow-up.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>Single-box pilot.</strong> App, orchestrator, model serving, and proxy share one server — a single point of failure by design, for pilot simplicity. Scale-out is the documented path if the pilot grows.</div></div>
-    <div class="cd"><span class="cd-badge">open</span><div><strong>SIEM integration is pull, not push.</strong> A security team can now export every audit trail off-host through a read-only, token-authenticated API (all three trails merged into one checkpointable stream, plus an operational-metrics snapshot; only the credential's hash is stored server-side, and failed attempts are themselves audited). What remains open: nothing pushes — off-host retention cadence depends on the poller, and the file-based trails on the host are still the system of record.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>SIEM integration is pull, not push.</strong> A security team can now export every audit trail off-host through a read-only, token-authenticated API (all three trails merged into one checkpointable stream, plus an operational-metrics snapshot). Credentials are issued per consumer from the admin console — plaintext shown exactly once, only hashes stored server-side, last use visible, each token individually revocable, and both token lifecycle and failed auth attempts are themselves audited. What remains open: nothing pushes — off-host retention cadence depends on the poller, and the file-based trails on the host are still the system of record.</div></div>
   </div>
 </section>
 
