@@ -442,14 +442,20 @@
 <section class="section" id="audit">
   <div class="sec-head reveal">
     <p class="kicker">07 · AUDIT &amp; TRACEABILITY</p>
-    <h2>Four independent trails — and an off-host export for all of them</h2>
+    <h2>Five independent trails — and an off-host export for all of them</h2>
   </div>
   <div class="audit-grid reveal">
     <div class="acard"><div class="a-ic">🛡️</div><h4>Central security log</h4><p>Every security-relevant app event — logins, lockouts, role changes, config changes, approvals, exports — logged with actor + IP, <strong>and mirrored to the root-owned system journal</strong>. If the file and the journal ever diverge, that's a tamper signal.</p><code>audit/admin-audit.log</code></div>
     <div class="acard"><div class="a-ic">📦</div><h4>Sandbox exec log</h4><p>Every command an agent runs, per user: identity, sandbox, the command itself, duration, outcome. The answer to <em>"what did the AI do inside its sandbox?"</em></p><code>&lt;user&gt;/aenv-audit.log</code></div>
+    <div class="acard"><div class="a-ic">🔍</div><h4>Data-access log</h4><p>Every cloud-connector read and write — SharePoint, Outlook, Jira, Slack, Drive, Entra and the rest. That data reaches corporate systems with the user's own credentials and <strong>never enters a sandbox</strong>, so the sandbox trail is structurally blind to it. The answer to <em>"did anyone use the agent to read that document?"</em></p><code>&lt;user&gt;/logs/data-access.log</code></div>
     <div class="acard"><div class="a-ic">🚪</div><h4>Real-action lifecycle log</h4><p>Every proposed real-host action, end to end: created → approved/denied → enqueued → result. The answer to <em>"what did a human authorize the AI to do outside it?"</em></p><code>&lt;team&gt;/real-action-audit.log</code></div>
     <div class="acard"><div class="a-ic">🌿</div><h4>Host config history</h4><p>Every change to <code>/etc</code> — nginx, systemd units, sudoers — is a git commit with a diff, via etckeeper. The answer to <em>"what changed about the infrastructure itself?"</em></p><code>cd /etc &amp;&amp; git log</code></div>
-    <div class="acard"><div class="a-ic">📡</div><h4>SIEM export API</h4><p>All application trails, pullable off-host with zero shell access: a read-only API merges them into one checkpointable stream plus a security-metrics snapshot. Per-consumer tokens are issued and revoked from the admin console — shown once, stored only as hashes, last use visible, and their lifecycle is itself audited.</p><code>GET /api/siem/audit?since=…</code></div>
+    <div class="acard"><div class="a-ic">📡</div><h4>SIEM export API</h4><p>All application trails, pullable off-host with zero shell access: a read-only API merges them into one checkpointable stream plus a security-metrics snapshot. Sources are <strong>independently selectable</strong>, so a team can subscribe to each and retain it on its own schedule. Per-consumer tokens are issued and revoked from the admin console — shown once, stored only as hashes, last use visible, and their lifecycle is itself audited.</p><code>GET /api/siem/audit?source=data_access&amp;since=…</code></div>
+  </div>
+
+  <div class="gp reveal" style="margin-top:28px">
+    <h4>An access log that isn't a second copy of your data</h4>
+    <p>The hard part of auditing data access is not recording it — it's recording it without building a shadow index of the very thing you're protecting. Log <em>"user X read Q3-Layoff-Plan.docx"</em> and that sensitive fact now lives in a second store, exported off-box under different access control and retention. So the data-access log follows four rules: it records the <strong>request, not the response</strong> (size only, never content); <strong>identifiers, not content</strong> (a document or ticket ID, enough to resolve against the source system); <strong>hashed free text</strong>, because <em>"user searched for 'layoffs'"</em> is itself a sensitive record; and everything that remains passes through the same PII scrubber that guards memory and RAG, with stable placeholders so a recipient still correlates across entries. Which arguments count as identifiers is declared in a single policy table — anything unlisted is simply not recorded, so a new tool argument is invisible until someone deliberately classifies it.</p>
   </div>
 </section>
 
