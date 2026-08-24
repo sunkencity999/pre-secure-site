@@ -17,6 +17,7 @@
   </a>
   <nav>
     <a href="#problem">Problem</a>
+    <a href="#capabilities">Capabilities</a>
     <a href="#architecture">Architecture</a>
     <a href="#flow">Request&nbsp;flow</a>
     <a href="#isolation">Isolation</a>
@@ -36,7 +37,8 @@
     <p class="lede">PRE Secure is a hardened agentic AI platform built around one question: <em>can we give people agents that actually run code and take actions — without handing a probabilistic system deterministic power over real infrastructure?</em></p>
     <p class="lede strong">The answer: agents never touch the host. Every command runs inside a disposable, hardware-isolated Firecracker microVM. The worst thing an agent can do is destroy a sandbox that never mattered.</p>
     <div class="hero-cta">
-      <a class="btn" href="#architecture">Explore the architecture</a>
+      <a class="btn" href="#capabilities">See what it can do</a>
+      <a class="btn ghost" href="#architecture">Explore the architecture</a>
       <a class="btn ghost" href="#gate">Try the approval gate</a>
       <a class="btn ghost" href="paper.html">Read the write-up 📄</a>
     </div>
@@ -142,10 +144,32 @@
   </div>
 </section>
 
+<!-- ============================================================ CAPABILITIES -->
+<section class="section" id="capabilities">
+  <div class="sec-head reveal">
+    <p class="kicker">02 · WHAT PEOPLE DO WITH IT</p>
+    <h2>The security is the architecture. This is the product.</h2>
+    <p class="sub">Everything else on this page is about containment. This is what's inside it: a full agentic assistant for every user on the team, running on models you host.</p>
+  </div>
+  <div class="audit-grid reveal">
+    <div class="acard"><div class="a-ic">🖥️</div><h4>A real dev machine, per user</h4><p>The agent writes code, runs it, reads the output, and iterates — installs packages, builds projects, crunches data files. State persists between sessions. The machine is disposable, and it is never the host.</p></div>
+    <div class="acard"><div class="a-ic">🧠</div><h4>Memory that compounds</h4><p>A per-user memory pool, knowledge graph, and experience ledger, auto-extracted from conversations. It learns your context and preferences once — privately, never team-visible.</p></div>
+    <div class="acard"><div class="a-ic">📚</div><h4>Team document intelligence</h4><p>Per-team RAG indexes: upload documents, index them, and get answers grounded in the team's own material — the team's knowledge, searchable from chat.</p></div>
+    <div class="acard"><div class="a-ic">🔌</div><h4>20 enterprise connectors</h4><p>GitHub, Jira, Confluence, ServiceNow, Slack, SharePoint, Outlook mail + calendar (it can RSVP for you), Google Workspace, Linear, Zoom, Figma, Asana, Dynamics 365, Telegram, Smartsheet — plus Entra ID directory lookups. Your credentials, acting only as you.</p></div>
+    <div class="acard"><div class="a-ic">⏰</div><h4>Automation that runs while you don't</h4><p>Cron schedules, file watchers, and webhooks fire agents on time or on events. Background agents grind through long tasks; parallel sub-agents fan out over big ones.</p></div>
+    <div class="acard"><div class="a-ic">🧬</div><h4>Skills that improve themselves</h4><p>Recurring workflows crystallize into reusable skills automatically, shared through a team marketplace. A skill that fails in real use revises itself — and rolls back if the revision doesn't beat the original.</p></div>
+    <div class="acard"><div class="a-ic">📊</div><h4>Live dashboards &amp; documents</h4><p>Generated HTML artifacts that stay live, polished PDF export, image generation, tabular data views. Ask for a command center; get one.</p></div>
+    <div class="acard"><div class="a-ic">🎯</div><h4>A model that learns you</h4><p>Calibrated per-tool confidence built from detected feedback, and PII-scrubbed fine-tuning exports — so the team's model improves on its own real usage.</p></div>
+  </div>
+  <div class="callout reveal">
+    <strong>Every capability inherits the same containment.</strong> Code runs in the microVM, every connector call lands in the data-access trail, memory and training exports pass the PII scrubber, and anything that would touch real infrastructure goes through the human gate below.
+  </div>
+</section>
+
 <!-- ============================================================ ARCHITECTURE -->
 <section class="section" id="architecture">
   <div class="sec-head reveal">
-    <p class="kicker">02 · ARCHITECTURE AT A GLANCE</p>
+    <p class="kicker">03 · ARCHITECTURE AT A GLANCE</p>
     <h2>Every path a request can take — and the one path that doesn't exist</h2>
     <p class="sub">Hover any component for what it does. The moving dashes are the live paths a request actually follows.</p>
   </div>
@@ -237,7 +261,7 @@
 <!-- ============================================================ REQUEST FLOW -->
 <section class="section" id="flow">
   <div class="sec-head reveal">
-    <p class="kicker">03 · REQUEST FLOW</p>
+    <p class="kicker">04 · REQUEST FLOW</p>
     <h2>Follow one command through the whole system</h2>
     <p class="sub">Step through what happens when a user asks their agent to run something. Watch the audit log write itself.</p>
   </div>
@@ -274,7 +298,7 @@
 <!-- ============================================================ ISOLATION -->
 <section class="section" id="isolation">
   <div class="sec-head reveal">
-    <p class="kicker">04 · THE ISOLATION LADDER</p>
+    <p class="kicker">05 · THE ISOLATION LADDER</p>
     <h2>Same exploit, three very different blast radii</h2>
     <p class="sub">Watch the ripple. The question isn't whether an agent will ever run something hostile — it's what happens when it does.</p>
   </div>
@@ -356,7 +380,7 @@
 <!-- ============================================================ APPROVAL GATE -->
 <section class="section" id="gate">
   <div class="sec-head reveal">
-    <p class="kicker">05 · THE HUMAN APPROVAL GATE</p>
+    <p class="kicker">06 · THE HUMAN APPROVAL GATE</p>
     <h2>One narrow door out of the sandbox — and a human holds the key</h2>
     <p class="sub">Sometimes a task genuinely needs to touch the real host. The agent can <em>propose</em> that. It can never <em>do</em> it. Try it yourself — you're the admin below.</p>
   </div>
@@ -416,7 +440,7 @@
 <!-- ============================================================ DEFENSE IN DEPTH -->
 <section class="section" id="defense">
   <div class="sec-head reveal">
-    <p class="kicker">06 · DEFENSE IN DEPTH</p>
+    <p class="kicker">07 · DEFENSE IN DEPTH</p>
     <h2>Ten independent layers. Each one assumes the others can fail.</h2>
     <p class="sub">Hover or tap a layer to see the specific threat it stops.</p>
   </div>
@@ -441,7 +465,7 @@
 <!-- ============================================================ AUDIT -->
 <section class="section" id="audit">
   <div class="sec-head reveal">
-    <p class="kicker">07 · AUDIT &amp; TRACEABILITY</p>
+    <p class="kicker">08 · AUDIT &amp; TRACEABILITY</p>
     <h2>Five independent trails — and an off-host export for all of them</h2>
   </div>
   <div class="audit-grid reveal">
@@ -462,7 +486,7 @@
 <!-- ============================================================ DATA PROTECTION -->
 <section class="section" id="data">
   <div class="sec-head reveal">
-    <p class="kicker">08 · DATA PROTECTION</p>
+    <p class="kicker">09 · DATA PROTECTION</p>
     <h2>PII is scrubbed where data becomes durable — not where it's useful</h2>
     <p class="sub">The agent <em>needs</em> live PII to do its job. The control point is the persistence boundary: the moment data would become long-term, team-shared, or model-bound, it's deterministically scrubbed. Watch it happen:</p>
   </div>
@@ -482,7 +506,7 @@
 <!-- ============================================================ MODEL INFRA -->
 <section class="section featured-section" id="models">
   <div class="sec-head reveal">
-    <p class="kicker violet-k">09 · SECURE MODEL INFRASTRUCTURE</p>
+    <p class="kicker violet-k">10 · SECURE MODEL INFRASTRUCTURE</p>
     <h2>The model never leaves the building. Neither does your data.</h2>
     <p class="sub">Most agent platforms are a thin shell around a third-party AI vendor's API — every prompt, every file, every secret in context crosses the internet to someone else's datacenter. PRE Secure is architected so that <strong>inference is infrastructure you control</strong>.</p>
   </div>
@@ -530,7 +554,7 @@
 <!-- ============================================================ SOX -->
 <section class="section" id="sox">
   <div class="sec-head reveal">
-    <p class="kicker">10 · BUILT FOR AUDITORS</p>
+    <p class="kicker">11 · BUILT FOR AUDITORS</p>
     <h2>Every control objective maps to a mechanism, a code path, and a test</h2>
     <p class="sub">Compliance is an organizational determination, not a software property — what this system claims is narrower and checkable: for each IT general control objective, here is the mechanism and how to verify it.</p>
   </div>
@@ -549,7 +573,7 @@
 <!-- ============================================================ CANDOR -->
 <section class="section" id="candor">
   <div class="sec-head reveal">
-    <p class="kicker">11 · HONEST TRADEOFFS</p>
+    <p class="kicker">12 · HONEST TRADEOFFS</p>
     <h2>A security document that lists no gaps isn't trustworthy</h2>
     <p class="sub">These are real, current, and tracked — stated plainly, the same way the closed ones were before they were closed.</p>
   </div>
