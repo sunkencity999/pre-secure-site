@@ -151,10 +151,11 @@
     <h2>The security is the architecture. This is the product.</h2>
     <p class="sub">Everything else on this page is about containment. This is what's inside it: a full agentic assistant for every user on the team, running on models you host.</p>
   </div>
-  <div class="audit-grid reveal">
+  <div class="audit-grid caps-grid reveal">
     <div class="acard"><div class="a-ic">🖥️</div><h4>A real dev machine, per user</h4><p>The agent writes code, runs it, reads the output, and iterates — installs packages, builds projects, crunches data files. State persists between sessions. The machine is disposable, and it is never the host.</p></div>
     <div class="acard"><div class="a-ic">🧠</div><h4>Memory that compounds</h4><p>A per-user memory pool, knowledge graph, and experience ledger, auto-extracted from conversations. It learns your context and preferences once — privately, never team-visible.</p></div>
     <div class="acard"><div class="a-ic">📚</div><h4>Team document intelligence</h4><p>Per-team RAG indexes: upload documents, index them, and get answers grounded in the team's own material — the team's knowledge, searchable from chat.</p></div>
+    <div class="acard"><div class="a-ic">🌐</div><h4>Reads the web like a person</h4><p>Private metasearch with no API key, and a page renderer that fetches, detects JavaScript shells and bot walls, renders them in headless Chrome, and returns the main content as Markdown, paged — so a React or Next.js page reads like a static one. Every target is vetted against the egress policy first.</p></div>
     <div class="acard"><div class="a-ic">🔌</div><h4>20 enterprise connectors</h4><p>GitHub, Jira, Confluence, ServiceNow, Slack, SharePoint, Outlook mail + calendar (it can RSVP for you), Google Workspace, Linear, Zoom, Figma, Asana, Dynamics 365, Telegram, Smartsheet — plus Entra ID directory lookups. Your credentials, acting only as you.</p></div>
     <div class="acard"><div class="a-ic">⏰</div><h4>Automation that runs while you don't</h4><p>Cron schedules, file watchers, and webhooks fire agents on time or on events. Background agents grind through long tasks; parallel sub-agents fan out over big ones.</p></div>
     <div class="acard"><div class="a-ic">🧬</div><h4>Skills that improve themselves</h4><p>Recurring workflows crystallize into reusable skills automatically, shared through a team marketplace. A skill that fails in real use revises itself — and rolls back if the revision doesn't beat the original.</p></div>
@@ -174,13 +175,14 @@
     <p class="sub">Hover any component for what it does. The moving dashes are the live paths a request actually follows.</p>
   </div>
   <div class="viz-frame reveal">
-    <svg viewBox="0 0 980 620" class="archSvg" role="img" aria-label="Architecture diagram: users reach nginx over TLS, then the application resolves tenant context and runs the tool loop; bash tool calls go through the exec gateway to the localhost-only AgentENV API and into per-user Firecracker microVMs; reasoning goes to local Ollama or an internal vLLM endpoint.">
+    <svg viewBox="0 0 980 620" class="archSvg" role="img" aria-label="Architecture diagram: users reach nginx over TLS, then the application resolves tenant context and runs the tool loop; bash tool calls go through the exec gateway to the localhost-only AgentENV API and into per-user Firecracker microVMs; reasoning goes to local Ollama or an internal vLLM endpoint; web search and page fetches go to loopback-only backends, a SearXNG metasearch and a headless-Chrome page renderer.">
       <!-- edges (drawn first, under nodes) -->
       <path d="M150,90 L150,150" class="flow f1"/>
       <path d="M150,238 L150,300" class="flow f1"/>
       <path d="M258,382 L332,382" class="flow f1"/>
       <path d="M560,340 C640,340 640,150 700,132" class="flow f2"/>
       <path d="M560,424 L700,424" class="flow f3"/>
+      <path d="M560,392 C630,392 630,290 700,290" class="flow f2"/>
       <path d="M838,462 L838,506" class="flow f3"/>
       <circle r="4" class="packet pk-a"/>
       <circle r="4" class="packet pk-b"/>
@@ -210,7 +212,7 @@
         <text x="159" y="396" class="nsub" text-anchor="middle">per-request isolation</text>
         <rect x="332" y="346" width="198" height="72" rx="10" class="nodebox inner"/>
         <text x="431" y="370" class="nlabel sm" text-anchor="middle">TOOL LOOP</text>
-        <text x="431" y="388" class="nsub" text-anchor="middle">bash · files · web search</text>
+        <text x="431" y="388" class="nsub" text-anchor="middle">bash · files · web search · fetch</text>
         <text x="431" y="404" class="nsub" text-anchor="middle">20 cloud connectors</text>
       </g>
 
@@ -230,6 +232,16 @@
         <text x="820" y="162" class="nsub" text-anchor="middle">Internal vLLM — your network</text>
       </g>
 
+      <!-- web backends -->
+      <g class="node" data-tip="Two loopback-only services the tool loop calls: a self-hosted SearXNG metasearch behind web_search (no API key, no search vendor sees the user), and a page renderer behind web_fetch — plain fetch first, JavaScript shells and bot walls re-rendered in headless Chrome, main content back as Markdown. API-keyed, its own non-root account, the same unit hardening as the app. Every target is vetted against the egress policy before either sees it.">
+        <rect x="700" y="236" width="240" height="110" rx="12" class="groupbox"/>
+        <text x="720" y="264" class="glabel">WEB BACKENDS <tspan class="nsub">— 127.0.0.1 only</tspan></text>
+        <rect x="712" y="276" width="216" height="28" rx="8" class="nodebox inner"/>
+        <text x="820" y="295" class="nsub" text-anchor="middle">SearXNG metasearch · web_search</text>
+        <rect x="712" y="310" width="216" height="28" rx="8" class="nodebox inner"/>
+        <text x="820" y="329" class="nsub" text-anchor="middle">Chrome page renderer · web_fetch</text>
+      </g>
+
       <!-- isolation -->
       <g class="node" data-tip="AgentENV (MIT, Firecracker orchestrator) has no built-in auth — so its API is bound to 127.0.0.1 and never exposed. The gateway is its only caller.">
         <rect x="700" y="380" width="240" height="84" rx="12" class="nodebox lock-node"/>
@@ -247,7 +259,8 @@
     </g>
 
       <!-- edge labels -->
-      <text x="640" y="300" class="elabel" text-anchor="middle">chat / reasoning</text>
+      <text x="612" y="262" class="elabel" text-anchor="middle">chat / reasoning</text>
+      <text x="640" y="378" class="elabel violet-t" text-anchor="middle">search · fetch</text>
       <text x="630" y="416" class="elabel aqua-t" text-anchor="middle">bash · file tools</text>
       <text x="70" y="128" class="elabel">HTTPS</text>
     </svg>
@@ -441,7 +454,7 @@
 <section class="section" id="defense">
   <div class="sec-head reveal">
     <p class="kicker">07 · DEFENSE IN DEPTH</p>
-    <h2>Ten independent layers. Each one assumes the others can fail.</h2>
+    <h2>Eleven independent layers. Each one assumes the others can fail.</h2>
     <p class="sub">Hover or tap a layer to see the specific threat it stops.</p>
   </div>
   <div class="depth reveal" id="depthStack">
@@ -454,6 +467,7 @@
     <div class="dlayer" data-stops="“What changed and when” ever being unanswerable"><span class="dl-name">Config history</span><span class="dl-mech">etckeeper — every /etc change is a git commit</span></div>
     <div class="dlayer" data-stops="Credential and session interception in transit"><span class="dl-name">Network / TLS</span><span class="dl-mech">nginx · HSTS · default-deny firewall · loopback-bound services</span></div>
     <div class="dlayer" data-stops="Lateral movement from a sandbox into internal networks — verified empirically, not just configured — plus open-web exfiltration for allowlisted users"><span class="dl-name">Egress control</span><span class="dl-mech">all RFC1918 / private-range traffic blocked from every sandbox · per-user deny-by-default web access with a domain allowlist (SNI/Host-matching egress proxy)</span></div>
+    <div class="dlayer" data-stops="A prompt-injected web fetch reaching loopback services, cloud metadata or internal hosts — directly, or through a rendered page's own requests"><span class="dl-name">Web fetch egress</span><span class="dl-mech">resolved-address check on every target and every redirect · a second guard inside the headless-Chrome renderer on each request a page makes · both web backends loopback-only, the renderer keyed and in its own account</span></div>
     <div class="dlayer" data-stops="An agent — or a prompt-injection-manipulated agent — unilaterally touching real systems"><span class="dl-name">Human gate</span><span class="dl-mech">propose → approve → separate no-sudo executor</span></div>
     <div class="depth-tip" id="depthTip">Hover a layer ↑</div>
   </div>
@@ -581,6 +595,7 @@
     <div class="cd"><span class="cd-badge">open</span><div><strong>The sandbox orchestrator is young.</strong> AgentENV is pre-1.0 and ships no auth of its own. Mitigated by strict localhost-only binding and by maintaining a privately patched fork — which helps, but doesn't eliminate the maturity risk.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>Web egress allowlisting shipped — DNS and UDP residuals remain.</strong> Sandboxes can now run deny-by-default with a per-user domain allowlist, enforced by a TCP egress proxy built into the maintained fork: web traffic is transparently redirected inside the sandbox's network namespace, matched by HTTP Host / TLS SNI, and resolved host-side so a forged SNI can't pick the upstream address. Access is a per-user admin setting in the UI. Stated plainly, what remains: UDP (QUIC) is not proxied, DNS stays reachable as a low-bandwidth exfiltration channel, and non-web ports are governed by IP/CIDR rules only.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>Street-number address lines are only partially caught.</strong> Tier-2 NER (a loopback-only Presidio sidecar) now scrubs names and named locations at every persistence boundary — but bare numeric street lines ("123 Main St") evade general NER; a dedicated address-pattern recognizer is the tracked follow-up.</div></div>
+    <div class="cd"><span class="cd-badge">open</span><div><strong>Rendered web pages run third-party JavaScript on the host, not in a microVM.</strong> The page renderer behind <code>web_fetch</code> is headless Chrome in its own unprivileged system account under the same systemd hardening as the app — loopback-bound, API-keyed, memory-capped, with an SSRF guard on every request a page makes. But Chrome runs there without its own process sandbox, because the hardened unit forbids the setuid helper and the user namespaces that sandbox needs. A renderer-escape exploit would land in that account, not in a disposable VM. Moving the renderer into a microVM is the tracked path.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>Single-box pilot.</strong> App, orchestrator, model serving, and proxy share one server — a single point of failure by design, for pilot simplicity. Scale-out is the documented path if the pilot grows.</div></div>
     <div class="cd"><span class="cd-badge">open</span><div><strong>SIEM integration is pull, not push.</strong> A security team can now export every audit trail off-host through a read-only, token-authenticated API (all three trails merged into one checkpointable stream, plus an operational-metrics snapshot). Credentials are issued per consumer from the admin console — plaintext shown exactly once, only hashes stored server-side, last use visible, each token individually revocable, and both token lifecycle and failed auth attempts are themselves audited. What remains open: nothing pushes — off-host retention cadence depends on the poller, and the file-based trails on the host are still the system of record.</div></div>
   </div>

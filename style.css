@@ -503,6 +503,9 @@ blockquote {
 .audit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; }
 @media (max-width: 1000px) { .audit-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 620px) { .audit-grid { grid-template-columns: 1fr; } }
+/* Nine capability cards: three rows of three at desktop width (the two-column
+   and one-column rules above still take over on narrower screens). */
+@media (min-width: 1001px) { .audit-grid.caps-grid { grid-template-columns: repeat(3, 1fr); } }
 .acard {
   background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius);
   padding: 1.3rem; font-size: 0.88rem;
